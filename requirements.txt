@@ -1,0 +1,8 @@
+###### Requirements without Version Specifiers ######
+h5py
+tqdm
+scikit-learn
+
+###### Requirements with Version Specifiers ######
+tensorflow
+keras
