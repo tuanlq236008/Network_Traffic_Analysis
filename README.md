@@ -1,150 +1,141 @@
-# Var-CNN
+# Network Traffic Analysis
 
-This repository contains code for the following paper:
+Dự án này phân tích lưu lượng mạng iCloud Private Relay bằng phương pháp học sâu trên dữ liệu PCAP. Mục tiêu là sử dụng các đặc trưng hướng gói, thời gian và metadata để phân loại lưu lượng và đánh giá khả năng nhận diện lớp lưu lượng riêng tư.
 
-[Var-CNN: A Data-Efficient Website Fingerprinting Attack Based on Deep 
-Learning](https://arxiv.org/abs/1802.10215) (PETS 2019,
-[link to presentation](https://docs.google.com/presentation/d/1Pry0nfHXvDhWYbHjf2QK75Rquc51s9rxK0g2XSNVeIk/edit?usp=sharing))
+Nó hỗ trợ hai kiến trúc chính:
 
-[Sanjit Bhat](https://sanjit-bhat.github.io), David Lu, 
-[Albert Kwon](http://www.albertkwon.com), and 
-[Srini Devadas](https://people.csail.mit.edu/devadas/).
+- `var-cnn` – một mô hình ResNet 1D kết hợp các kênh `dir`, `time`, `metadata`
+- `df` – mô hình Deep Fingerprinting (DF) chỉ dùng hướng gói tin
 
-## Dependencies
-1. Ensure that you have a functioning machine with an NVIDIA GPU inside it. 
-The model will take significantly longer to run on a CPU. 
-2. Make sure you have the TensorFlow/Keras deep learning stack installed.
-For detailed instructions, see 
-[this link](https://blog.slavv.com/the-1700-great-deep-learning-box-assembly-setup-and-benchmarks-148c5ebe6415) 
-under the "Software Setup" section. For our experiments, we used Ubuntu 
-16.04 LTS, CUDA 8.0, CuDNN v6, and TensorFlow 1.3.0 as a backend for Keras 2.0.8.
-3. To install all required Python packages, simply issue the following command:
-```pip install -r requirements.txt```.
+## Mục tiêu
 
-## Control Flow
-The first step in running our model is to place the adequate amount
-of raw packet sequences in the ```data_dir``` folder. **Each** monitored
-website needs to have **at least** ```num_mon_inst_train``` + ```num_mon_inst_test```
-instances, and there needs to be **at least** 
-```num_unmon_sites_train``` + ```num_unmon_sites_test``` unmonitored sites.
+- Chuyển đổi tệp PCAP thành dữ liệu đầu vào cho mạng nơ-ron
+- Tiền xử lý và tạo bộ dữ liệu `.h5`
+- Huấn luyện và đánh giá mô hình
+- Xuất dự đoán và tính chỉ số hiệu suất
 
-If you use the Wang et al. data format (i.e., each line representing a 
-new packet with the relative time and direction separated by a space), 
-then we have that supported in ```wang_to_varcnn.py```. Otherwise, you will need 
-to modify ```wang_to_varcnn.py```, or you can write your own glue code to move
-to the **Wang et al. format**.
+## Yêu cầu
 
-After setting up the data and specifying the parameters in ```config.json```,
-you can run all parts of our code just by issuing a ```python run_model.py```
-command. After that, our programs will be called in the following sequence:
+- Python 3.x
+- TensorFlow
+- Keras
+- h5py
+- scikit-learn
+- tqdm
+- `tshark` (thuộc Wireshark)
 
-1. ```wang_to_varcnn.py```: This parses the ```data_dir``` folder; extracts direction,
-time, metadata, and labels; and stores all the monitored and unmonitored
-traces in ```all_closed_world.npz``` and ```all_open_world.npz```,
-respectively, in the ```data_dir``` folder.
-2. ```preprocess_data.py```: This uses the data in 
-```all_closed_world.npz``` to pick a random
-```num_mon_inst_train``` and ```num_mon_inst_test``` instances of each
-of the ```num_mon_sites``` monitored sites for the training and test sets, respectively.
-It also performs a similar random split for the unmonitored sites (using the
-```all_open_world.npz``` file) and preprocesses
-all of these traces to scale the metadata, change to inter-packet timing, etc.
-Finally, it saves the direction data, time data, metadata, and labels
-to ```.h5``` files to conserve RAM during the training process.
-3. ```run_model.py```: This is the main file that first calls the prior two files.
-Next, it loads the model architectures from either ```var_cnn.py``` or 
-```df.py```, trains the models, saves their predictions, and
-calls ```evaluate.py``` for evaluation. 
-4. During training, ```data_generator.py``` generates new batches of data in 
-parallel. Since large datasets can contain hundreds of thousands 
-of traces, ```data_generator.py``` uses ```.h5``` files to
-access the traces for one batch without loading the entire dataset into memory.
-5. ```evaluate.py```: This first calculates metrics for each of the
-in-training combinations specified in ```mixture```. Then,
-it averages each of their predictions together and reports metrics for the
-overall out-of-training ensemble. It saves all metrics to the ```job_result.json```
-file.
+Nội dung có sẵn trong `requirements.txt`.
 
+## Cấu trúc thư mục chính
 
-## Parameters
-```config.json``` provides the configuration settings to all the 
-other programs. We describe its parameters in further detail below:
+- `src/pcap_to_npz.py` – chuyển đổi PCAP sang `all_closed_world.npz` và `all_open_world.npz`
+- `src/preprocess_data.py` – tiền xử lý dữ liệu và lưu trữ `.h5`
+- `src/run_model.py` – huấn luyện, dự đoán và đánh giá mô hình
+- `src/var_cnn.py` – kiến trúc Var-CNN và các callback
+- `src/df.py` – kiến trúc Deep Fingerprinting
+- `src/evaluate.py` – tính chỉ số TPR/FPR và ghi `job_result.json`
+- `src/data_generator.py` – tạo batch dữ liệu an toàn cho nhiều luồng
+- `src/wang_to_varcnn.py` – hỗ trợ chuyển đổi dữ liệu định dạng cũ sang định dạng Var-CNN
+- `src/predic/` – các script dự đoán và kiểm tra riêng
 
-1. ```data_dir```: This relative path provides the location of the "raw"
-packet sequences (e.g., the "0", "1", "0-0", "0-1" files in Wang et al.'s
-dataset). Also, it later stores the ```all_closed_world.npz``` and
-```all_open_world.npz``` files generated by ```wang_to_varcnn.py``` and the
-```.h5``` data files generated by ```preprocess_data.py```.
-2. ```predictions_dir```: After training the model, ```run_model.py``` 
-generates predictions for the test set and stores them in this directory.
-```evaluate.py``` later uses them to calculate test metrics.
-3. ```num_mon_sites```: The number of monitored websites.
-Each of the ```num_mon_sites``` sites in ```data_dir``` must have at least
-```num_mon_inst_train``` + ```num_mon_inst_test``` instances.
-4. ```num_mon_inst_train```: The number of monitored instances used for training.
-5. ```num_mon_inst_test```: The number of monitored instances used for testing.
-6. ```num_unmon_sites_train```: The number of unmonitored sites used for training.
-Each site has one instance.
-7. ```num_unmon_sites_test```: The number of unmonitored sites used for testing.
-Each site has one instance, and these unmonitored websites are different
-from those used for training.
-8. ```model_name```: The model name. Either "var-cnn" or "df".
-9. ```batch_size```: The batch size used during training. For Var-CNN,
-we found that a batch size of 50 works well. The recommended batch size
-for DF is 128.
-10. ```mixture```: The mixture of ensembles used during training and
-evaluation. Each of the inner arrays represent models combined in-training.
-```run_model``` will save the predictions for every such in-training combination.
-Subsequently, ```evaluate_ensemble``` will report metrics for these individual
-models as well as the overall out-of-training ensemble (i.e., the average
-of the individual predictions). Note: this functionality only works
-with Var-CNN (in fact, deep fingerprinting will automatically default
-to using ```[["dir"]]```). Also, do not use two in-training combinations 
-with the same components as their prediction files will be overwritten.
-Default: ```[["dir", "metadata"], ["time", "metadata"]]``` for Var-CNN.
-11. ```seq_length```: The length of the input sequence fed into the CNN
-(default: 5000).
-We use this parameter right from the start when scraping the raw data.
-12. ```df_epochs```: The number of epochs used to train DF (default: 30).
-13. ```var_cnn_max_epochs```: The maximum number of epochs used to train 
-Var-CNN (default: 150). The ```EarlyStopping``` callback often cuts off training 
-much sooner -- whenever validation accuracy fails to increase.
-14. ```var_cnn_base_patience```: The "patience" (i.e., number of epochs
-of no validation accuracy improvement) until we decrease the learning 
-rate of Var-CNN and stop training (default: 5). We implement this functionality
-in the ```ReduceLROnPlateau``` and ```EarlyStopping``` callbacks
-inside ```var_cnn.py```.
-15. ```dir_dilations```: Whether to use dilations with the
-direction ResNet (default: true).
-16. ```time_dilations```: Whether to use dilations with the
-time ResNet (default: true).
-17. ```inter_time```: Whether to use the inter-packet time
-(i.e., time between two packets) or the relative time (i.e.,
-time from the first packet) for timing data (default: true, i.e., we do use
-inter-packet time).
-18. ```scale_metadata```. Whether to scale metadata to zero mean
-and unit variance (default: true).
-   
+## Cách dùng
 
-## Citation
-If you find Var-CNN useful in your research, please consider citing:
+### 1. Cài đặt môi trường
 
-	@article{bhat19,
-	  title={{Var-CNN: A Data-Efficient Website Fingerprinting Attack Based on Deep Learning}},
-	  author={Bhat, Sanjit and Lu, David and Kwon, Albert and Devadas, Srinivas},
-	  journal={Proceedings on Privacy Enhancing Technologies},
-	  volume={4},
-	  pages={292--310},
-	  year={2019}
-	}   
+Chạy:
 
-## Contact
-sanjit.bhat (at) gmail.com
+```bash
+pip install -r requirements.txt
+```
 
-davidboxboro (at) gmail.com
+### 2. Chuẩn bị `config.json`
 
-kwonal (at) mit.edu
+`src/run_model.py` và nhiều script khác đọc cấu hình từ `config.json` nằm ở thư mục gốc.
+Bạn cần tạo file này với những trường sau:
 
-devadas (at) mit.edu
+```json
+{
+  "data_dir": "./data/",
+  "predictions_dir": "./predictions/",
+  "model_name": "var-cnn",
+  "mixture": [["dir"], ["time"], ["metadata"], ["dir", "time", "metadata"]],
+  "batch_size": 128,
+  "var_cnn_max_epochs": 100,
+  "df_epochs": 50,
+  "num_mon_sites": 50,
+  "num_mon_inst_train": 10,
+  "num_mon_inst_test": 5,
+  "num_unmon_sites_train": 10,
+  "num_unmon_sites_test": 10,
+  "seq_length": 5000,
+  "inter_time": true,
+  "scale_metadata": true,
+  "dir_dilations": true,
+  "time_dilations": true,
+  "var_cnn_base_patience": 5
+}
+```
 
-Any discussions, suggestions, and questions are welcome!
+> Chú ý: thay đổi giá trị theo bộ dữ liệu và thử nghiệm của bạn.
+
+### 3. Chuyển đổi PCAP thành NPZ
+
+Chạy:
+
+```bash
+python src/pcap_to_npz.py
+```
+
+- Script này dùng `tshark` để giải mã file PCAP.
+- Nếu `tshark` không nằm ở đường dẫn macOS mặc định, chỉnh `TSHARK_PATH` trong `src/pcap_to_npz.py`.
+
+### 4. Tiền xử lý dữ liệu
+
+Chạy:
+
+```bash
+python src/preprocess_data.py
+```
+
+Nó sẽ đọc `all_closed_world.npz` và `all_open_world.npz`, tách dữ liệu thành training/test, chuẩn hóa metadata và lưu file `.h5`.
+
+### 5. Huấn luyện và đánh giá
+
+Chạy:
+
+```bash
+python src/run_model.py
+```
+
+- Với `model_name: "var-cnn"`, project sử dụng `src/var_cnn.py`.
+- Với `model_name: "df"`, project sử dụng `src/df.py`.
+
+Kết quả:
+
+- Trọng số model tốt nhất được lưu vào `model_weights.weights.h5`
+- Dự đoán lưu vào thư mục `predictions_dir`
+- Báo cáo đánh giá lưu tại `job_result.json`
+
+## Gợi ý cấu hình
+
+- `data_dir`: thư mục chứa dữ liệu và file `.npz`
+- `predictions_dir`: nơi lưu file `*_model.npy`
+- `mixture`: danh sách cấu hình mô hình kết hợp `dir`, `time`, `metadata`
+- `batch_size`: kích thước batch huấn luyện
+- `seq_length`: độ dài chuỗi gói tin (mặc định 5000)
+- `inter_time`: chuyển đổi thời gian tuyệt đối sang khoảng thời gian giữa gói
+- `scale_metadata`: chuẩn hóa metadata trước khi đưa vào mô hình
+
+## Lưu ý
+
+- File `config.json` là bắt buộc.
+- Nếu dữ liệu chưa có `all_closed_world.npz` / `all_open_world.npz`, chạy `src/pcap_to_npz.py` trước.
+- Nếu dùng GPU, đảm bảo TensorFlow đã được cài đúng phiên bản tương thích.
+
+## Thêm
+
+Các script trong `src/predic/` hỗ trợ kiểm tra dự đoán và dự đoán một file PCAP đơn lẻ.
+
+---
+
+Nếu cần, bạn có thể mở rộng README bằng ví dụ `config.json` cụ thể cho bộ dữ liệu của bạn hoặc thêm hướng dẫn chuẩn bị thư mục dữ liệu. 
