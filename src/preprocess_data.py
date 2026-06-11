@@ -51,14 +51,15 @@ def main(config):
     mon_dataset = np.load(mon_data_loc)
     mon_dir_seq = mon_dataset['dir_seq']
     mon_time_seq = mon_dataset['time_seq']
+    mon_length_seq = mon_dataset['length_seq']
     mon_metadata = mon_dataset['metadata']
     mon_labels = mon_dataset['labels']
 
     mon_site_data = {}
     mon_site_labels = {}
     print('getting enough monitored websites')
-    for dir_seq, time_seq, metadata, site_name \
-            in tqdm(zip(mon_dir_seq, mon_time_seq, mon_metadata, mon_labels)):
+    for dir_seq, time_seq, length_seq, metadata, site_name \
+            in tqdm(zip(mon_dir_seq, mon_time_seq, mon_length_seq, mon_metadata, mon_labels)):
         if site_name not in mon_site_data:
             if len(mon_site_data) >= num_mon_sites:
                 continue
@@ -67,7 +68,7 @@ def main(config):
                 mon_site_labels[site_name] = len(mon_site_labels)
 
         mon_site_data[site_name].append(
-            [dir_seq, time_seq, metadata, mon_site_labels[site_name]])
+            [dir_seq, time_seq, length_seq, metadata, mon_site_labels[site_name]])
 
     print('randomly choosing instances for training and test sets')
     assert len(mon_site_data) == num_mon_sites
@@ -82,7 +83,7 @@ def main(config):
             else:
                 break
 
-    del mon_dataset, mon_dir_seq, mon_time_seq, mon_metadata, \
+    del mon_dataset, mon_dir_seq, mon_time_seq, mon_length_seq, mon_metadata, \
         mon_labels, mon_site_data, mon_site_labels
 
     print('reading unmonitored data')
@@ -90,11 +91,12 @@ def main(config):
     unmon_dataset = np.load(unmon_data_loc)
     unmon_dir_seq = unmon_dataset['dir_seq']
     unmon_time_seq = unmon_dataset['time_seq']
+    unmon_length_seq = unmon_dataset['length_seq']
     unmon_metadata = unmon_dataset['metadata']
 
-    unmon_site_data = [[dir_seq, time_seq, metadata, num_mon_sites] for
-                       dir_seq, time_seq, metadata in
-                       zip(unmon_dir_seq, unmon_time_seq, unmon_metadata)]
+    unmon_site_data = [[dir_seq, time_seq, length_seq, metadata, num_mon_sites] for
+                       dir_seq, time_seq, length_seq, metadata in
+                       zip(unmon_dir_seq, unmon_time_seq, unmon_length_seq, unmon_metadata)]
 
     print('randomly choosing unmonitored instances for training and test sets')
     random.shuffle(unmon_site_data)
@@ -113,7 +115,7 @@ def main(config):
         else:
             break
 
-    del unmon_dataset, unmon_dir_seq, unmon_time_seq, \
+    del unmon_dataset, unmon_dir_seq, unmon_time_seq, unmon_length_seq, \
         unmon_metadata, unmon_site_data
 
     print('processing data')
@@ -124,22 +126,26 @@ def main(config):
 
     train_dir = []
     train_time = []
+    train_length = []
     train_metadata = []
     train_labels = []
 
     test_dir = []
     test_time = []
+    test_length = []
     test_metadata = []
     test_labels = []
 
-    for dir_seq, time_seq, metadata, label in train_seq_and_labels:
+    for dir_seq, time_seq, length_seq, metadata, label in train_seq_and_labels:
         train_dir.append(dir_seq)
         train_time.append(time_seq)
+        train_length.append(length_seq)
         train_metadata.append(metadata)
         train_labels.append(label)
-    for dir_seq, time_seq, metadata, label in test_seq_and_labels:
+    for dir_seq, time_seq, length_seq, metadata, label in test_seq_and_labels:
         test_dir.append(dir_seq)
         test_time.append(time_seq)
+        test_length.append(length_seq)
         test_metadata.append(metadata)
         test_labels.append(label)
 
@@ -147,10 +153,12 @@ def main(config):
 
     train_dir = np.array(train_dir)
     train_time = np.array(train_time)
+    train_length = np.array(train_length)
     train_metadata = np.array(train_metadata)
 
     test_dir = np.array(test_dir)
     test_time = np.array(test_time)
+    test_length = np.array(test_length)
     test_metadata = np.array(test_metadata)
 
     # Converts from absolute times to inter-packet times.
@@ -174,10 +182,23 @@ def main(config):
     test_time = np.reshape(test_time,
                            (test_time.shape[0], test_time.shape[1], 1))
 
+    train_length = np.reshape(train_length,
+                              (train_length.shape[0], train_length.shape[1], 1))
+    test_length = np.reshape(test_length,
+                             (test_length.shape[0], test_length.shape[1], 1))
+
     if scale_metadata:
         metadata_scaler = StandardScaler()
         train_metadata = metadata_scaler.fit_transform(train_metadata)
         test_metadata = metadata_scaler.transform(test_metadata)
+
+    scale_length = config.get('scale_length', True)
+    if scale_length:
+        length_scaler = StandardScaler()
+        train_shape = train_length.shape
+        test_shape = test_length.shape
+        train_length = length_scaler.fit_transform(train_length.reshape(-1, 1)).reshape(train_shape)
+        test_length = length_scaler.transform(test_length.reshape(-1, 1)).reshape(test_shape)
 
     # One-hot encoding of labels, using one more class for
     # unmonitored sites if in open-world
@@ -188,12 +209,14 @@ def main(config):
     print('training data stats:')
     print(train_dir.shape)
     print(train_time.shape)
+    print(train_length.shape)
     print(train_metadata.shape)
     print(train_labels.shape)
 
     print('testing data stats:')
     print(test_dir.shape)
     print(test_time.shape)
+    print(test_length.shape)
     print(test_metadata.shape)
     print(test_labels.shape)
 
@@ -206,18 +229,21 @@ def main(config):
         f.create_group('test_data')
         for ds_name, arr in [['dir_seq', train_dir],
                              ['time_seq', train_time],
+                             ['length_seq', train_length],
                              ['metadata', train_metadata],
                              ['labels', train_labels]]:
             f.create_dataset('training_data/' + ds_name,
                              data=arr[:int(0.95 * len(arr))])
         for ds_name, arr in [['dir_seq', train_dir],
                              ['time_seq', train_time],
+                             ['length_seq', train_length],
                              ['metadata', train_metadata],
                              ['labels', train_labels]]:
             f.create_dataset('validation_data/' + ds_name,
                              data=arr[int(0.95 * len(arr)):])
         for ds_name, arr in [['dir_seq', test_dir],
                              ['time_seq', test_time],
+                             ['length_seq', test_length],
                              ['metadata', test_metadata],
                              ['labels', test_labels]]:
             f.create_dataset('test_data/' + ds_name,

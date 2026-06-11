@@ -1,8 +1,17 @@
-###### Requirements without Version Specifiers ######
-h5py
-tqdm
-scikit-learn
+###### Network Traffic Analysis - Requirements ######
+# Deep Learning Framework
+tensorflow>=2.10.0
+keras>=2.10.0
 
-###### Requirements with Version Specifiers ######
-tensorflow
-keras
+# Data Processing & Analysis
+numpy>=1.23.0
+h5py>=3.6.0
+
+# Machine Learning & Evaluation
+scikit-learn>=1.2.0
+
+# Utilities
+tqdm>=4.65.0
+
+# Optional: For GPU support
+# tensorflow[and-cuda]>=2.10.0

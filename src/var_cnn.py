@@ -222,9 +222,11 @@ def get_model(config, mixture_num):
     mixture = config['mixture']
     use_dir = 'dir' in mixture[mixture_num]
     use_time = 'time' in mixture[mixture_num]
+    use_length = 'length' in mixture[mixture_num]
     use_metadata = 'metadata' in mixture[mixture_num]
     dir_dilations = config['dir_dilations']
     time_dilations = config['time_dilations']
+    length_dilations = config.get('length_dilations', True)
     seq_length = config['seq_length']
     model_name = config['model_name']
 
@@ -244,6 +246,14 @@ def get_model(config, mixture_num):
         else:
             time_output = ResNet18(time_input, 'time', block=basic_1d)
 
+    # Constructs length ResNet
+    if use_length:
+        length_input = Input(shape=(seq_length, 1,), name='length_input')
+        if length_dilations:
+            length_output = ResNet18(length_input, 'length', block=dilated_basic_1d)
+        else:
+            length_output = ResNet18(length_input, 'length', block=basic_1d)
+
     # Construct MLP for metadata
     if use_metadata:
         metadata_input = Input(shape=(7,), name='metadata_input')
@@ -261,6 +271,9 @@ def get_model(config, mixture_num):
     if use_time:
         input_params.append(time_input)
         concat_params.append(time_output)
+    if use_length:
+        input_params.append(length_input)
+        concat_params.append(length_output)
     if use_metadata:
         input_params.append(metadata_input)
         concat_params.append(metadata_output)

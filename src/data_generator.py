@@ -59,6 +59,7 @@ def generate(config, data_type, mixture_num):
     mixture = config['mixture']
     use_dir = 'dir' in mixture[mixture_num]
     use_time = 'time' in mixture[mixture_num]
+    use_length = 'length' in mixture[mixture_num]
     use_metadata = 'metadata' in mixture[mixture_num]
 
     with h5py.File('%s%d_%d_%d_%d.h5' % (data_dir, num_mon_sites, num_mon_inst,
@@ -67,6 +68,7 @@ def generate(config, data_type, mixture_num):
         # Stores a **reference** of the data, not the actual data, in memory
         dir_seq = f[data_type + '/dir_seq']
         time_seq = f[data_type + '/time_seq']
+        length_seq = f[data_type + '/length_seq']
         metadata = f[data_type + '/metadata']
         labels = f[data_type + '/labels']
 
@@ -84,6 +86,8 @@ def generate(config, data_type, mixture_num):
                 batch_data[0]['dir_input'] = dir_seq[batch_start:batch_end]
             if use_time:
                 batch_data[0]['time_input'] = time_seq[batch_start:batch_end]
+            if use_length:
+                batch_data[0]['length_input'] = length_seq[batch_start:batch_end]
             if use_metadata:
                 batch_data[0]['metadata_input'] = metadata[
                                                   batch_start:batch_end]
