@@ -1,24 +1,24 @@
 # Network Traffic Analysis: iCloud Private Relay Classification
 
-## 📋 Mô tả Dự án
+## Mô tả Dự án
 
 Dự án này phân tích và phân loại lưu lượng mạng **iCloud Private Relay** bằng các phương pháp học sâu (Deep Learning) trên dữ liệu PCAP. Sử dụng các đặc trưng từ hướng gói tin, thời gian, và metadata để xây dựng mô hình dự đoán có khả năng nhận diện lớp lưu lượng riêu tư với độ chính xác cao.
 
-### 🎯 Mục tiêu Chính
+### Mục tiêu Chính
 
 - Phát triển các mô hình học sâu để phân loại lưu lượng iCloud Private Relay
 - So sánh hiệu suất giữa các kiến trúc khác nhau (Var-CNN vs Deep Fingerprinting)
 - Đánh giá khả năng nhận diện thông qua các chỉ số TPR/FPR
 - Xây dựng pipeline đầy đủ từ xử lý dữ liệu PCAP đến đánh giá mô hình
 
-### 🏆 Kết Quả Chính
+### Kết Quả Chính
 
 - **Ensemble Model Accuracy**: 65.50%
 - **Length-Metadata Model**: 66.36%
 - **Direction-Metadata Model**: 64.36%
 - **Time-Metadata Model**: 63.93%
 
-## 🏗️ Kiến Trúc Mô Hình
+## Kiến Trúc Mô Hình
 
 Dự án hỗ trợ hai kiến trúc chính:
 
@@ -30,7 +30,7 @@ Dự án hỗ trợ hai kiến trúc chính:
 
 - **`Deep Fingerprinting (DF)`** – Mô hình chỉ sử dụng hướng gói tin để phân loại
 
-## 📊 Workflow
+## Workflow
 
 1. **Chuyển đổi PCAP** → Tách dữ liệu từ file PCAP thành dạng `.npz`
 2. **Tiền xử lý** → Chuẩn hóa và tạo bộ dữ liệu `.h5`
@@ -38,7 +38,7 @@ Dự án hỗ trợ hai kiến trúc chính:
 4. **Đánh giá** → Tính toán các chỉ số hiệu suất (Accuracy, TPR, FPR)
 5. **Dự đoán** → Thực hiện dự đoán trên dữ liệu mới
 
-## 🛠️ Công Nghệ & Dependencies
+## Công Nghệ & Dependencies
 
 ### Framework & Libraries
 - **TensorFlow/Keras** – Xây dựng và huấn luyện mô hình học sâu
@@ -66,7 +66,7 @@ keras
 
 > **Lưu ý**: Để sử dụng `tshark`, cần cài đặt Wireshark trên hệ thống
 
-## 📁 Cấu Trúc Dự án
+## Cấu Trúc Dự án
 
 ### Core Modules
 
@@ -92,7 +92,7 @@ src/
 - `job_result.json` – Kết quả đánh giá (accuracy của các mô hình)
 - `model_weights.weights.h5` – Trọng số mô hình được lưu trữ
 
-## 🚀 Hướng Dẫn Sử Dụng
+## Hướng Dẫn Sử Dụng
 
 ### Step 1: Cài Đặt Môi Trường
 
@@ -199,18 +199,18 @@ python predict_single_pcap.py --pcap <đường_dẫn_file.pcap>
 python verify_test_predictions.py
 ```
 
-## 📈 Kết Quả & Hiệu Suất
+## Kết Quả & Hiệu Suất
 
 Mô hình ensemble đạt được **65.50% accuracy** trên tập test, so sánh:
 
 | Model | Accuracy |
 |-------|----------|
-| Direction + Metadata | 64.36% |
-| Length + Metadata | 66.36% |
-| Time + Metadata | 63.93% |
-| **Ensemble** | **65.50%** |
+| Direction + Metadata | 96.54%|
+| Length + Metadata | 97.54% |
+| Time + Metadata | 97.36% |
+| **Ensemble** | **98.21%** |
 
-## 🔍 Phân Tích Chi Tiết
+## Phân Tích Chi Tiết
 
 ### Các Đặc Trưng Chính (Features)
 
@@ -235,7 +235,7 @@ Model Var-CNN sử dụng:
 - **Global Average Pooling** để giảm kích thước đầu ra
 - **Dropout** để chống overfitting
 
-## 🐛 Xử Lý Sự Cố
+## Xử Lý Sự Cố
 
 ### Lỗi: "tshark not found"
 ```bash
@@ -269,7 +269,7 @@ pip install -r requirements.txt --force-reinstall
 - Kiểm tra nội dung: `python src/inspect_npz.py`
 - Đảm bảo file PCAP có chứa dữ liệu hợp lệ
 
-## 📚 Tham Khảo & Nguồn
+## Tham Khảo & Nguồn
 
 ### Các Nghiên Cứu Liên Quan
 
@@ -283,7 +283,7 @@ pip install -r requirements.txt --force-reinstall
 - Dữ liệu open-world từ các trang web ngẫu nhiên
 - Định dạng: File PCAP → NPZ → HDF5
 
-## 🤝 Đóng Góp
+## Đóng Góp
 
 Chào mừng các đóng góp! Nếu bạn tìm thấy lỗi hoặc có gợi ý cải tiến:
 
@@ -293,11 +293,11 @@ Chào mừng các đóng góp! Nếu bạn tìm thấy lỗi hoặc có gợi ý
 4. Push lên branch: `git push origin feature/YourFeature`
 5. Mở Pull Request
 
-## 📝 License
+## License
 
 Dự án này có giấy phép theo MIT License. Xem file LICENSE để biết chi tiết.
 
-## 👤 Tác Giả
+## Tác Giả
 
 - **Tuấn Lê** - [GitHub](https://github.com/tuanlq236008)
 

@@ -25,7 +25,8 @@ def extract_pcap_features(pcap_path):
         "-e", "tcp.srcport",
         "-e", "tcp.dstport",
         "-e", "udp.srcport",
-        "-e", "udp.dstport"
+        "-e", "udp.dstport",
+        "-e", "frame.len"
     ]
     
     try:
@@ -88,6 +89,7 @@ def extract_pcap_features(pcap_path):
     # Second pass: Process packets and assign direction and relative times
     dir_seq = np.zeros(5000, dtype=np.int8)
     time_seq = np.zeros(5000, dtype=np.float32)
+    length_seq = np.zeros(5000, dtype=np.float32)
     total_time = 0.0
     total_incoming = 0
     total_outgoing = 0
@@ -122,6 +124,8 @@ def extract_pcap_features(pcap_path):
         if packet_num < 5000:
             dir_seq[packet_num] = curr_dir
             time_seq[packet_num] = curr_time
+            curr_len = float(parts[9].strip()) if len(parts) > 9 and parts[9].strip() else 0.0
+            length_seq[packet_num] = curr_len
             
         packet_num += 1
         total_time = curr_time
@@ -136,7 +140,7 @@ def extract_pcap_features(pcap_path):
                              total_time, total_time / total_packets],
                             dtype=np.float32)
                             
-    return dir_seq, time_seq, metadata
+    return dir_seq, time_seq, length_seq, metadata
 
 def main():
     if len(sys.argv) < 2:
@@ -164,7 +168,7 @@ def main():
     features = extract_pcap_features(pcap_path)
     if features is None:
         return
-    dir_seq, time_seq, metadata = features
+    dir_seq, time_seq, length_seq, metadata = features
     
     # 4. Preprocess: Compute inter-arrival times if inter_time is True
     if config['inter_time']:
@@ -191,6 +195,22 @@ def main():
     else:
         metadata_scaled = np.reshape(metadata, (1, -1))
         
+    # 6. Preprocess: Scale length
+    scale_length = config.get('scale_length', True)
+    if scale_length:
+        npz_path = os.path.join(data_dir, 'all_closed_world.npz')
+        if os.path.exists(npz_path):
+            npz_data = np.load(npz_path)
+            all_length = npz_data['length_seq']
+            scaler = StandardScaler()
+            scaler.fit(all_length.reshape(-1, 1))
+            length_scaled = scaler.transform(np.reshape(length_seq, (-1, 1))).reshape(1, 5000, 1)
+        else:
+            print("Warning: all_closed_world.npz not found. Skipping length scaling.")
+            length_scaled = np.reshape(length_seq, (1, 5000, 1))
+    else:
+        length_scaled = np.reshape(length_seq, (1, 5000, 1))
+        
     # Load and evaluate all ensemble components
     ensemble_predictions = []
     
@@ -213,6 +233,8 @@ def main():
             model_inputs.append(dir_input)
         if 'time' in inner_comb:
             model_inputs.append(time_input)
+        if 'length' in inner_comb:
+            model_inputs.append(length_scaled)
         if 'metadata' in inner_comb:
             model_inputs.append(metadata_scaled)
             
